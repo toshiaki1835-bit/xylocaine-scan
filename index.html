@@ -61,8 +61,8 @@
 </div>
 
 <script>
-  // 【設定済み】ご提供いただいたGASのウェブアプリURL
-  const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzvT58qF6-q9pumzZ4cnsgKN8jeJRcAl3JzR-CVlM_78SVZF-x8wymX2Gwft0e8DQ5N/exec";
+  // 提示いただいたGASのウェブアプリURLをここに設定しました
+  const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyHCbRzz30sM9bEnH0iZMyEBMhqTrhDiwliDNdCMWL81_tb5jKTr75PF1FdWuf5kaWA/exec";
 
   // 提供いただいた正確な10mLポリアンプルのGTINコード
   const MASTER_GTIN = {
@@ -174,7 +174,7 @@
       judgment: judgment
     };
 
-    // GASへデータを送信
+    // GASのdoPostへデータを送信
     fetch(GAS_WEB_APP_URL, {
       method: 'POST',
       body: JSON.stringify(payload)
