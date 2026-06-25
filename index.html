@@ -64,8 +64,8 @@
 </div>
 
 <script>
-  // ▼ ご提示いただいた最新のGASのURLをセットしました
-  const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzvT58qF6-q9pumzZ4cnsgKN8jeJRcAl3JzR-CVlM_78SVZF-x8wymX2Gwft0e8DQ5N/exec";
+  // 【自動設定済み】ご提示いただいた最新の新しいGASのURL
+  const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbz-KoLwKwyJ07C3CbD7KLsv7EG_wvUWQCnlgWojUpDxRtM-ZJGpdn6oLLd3haVOzXJK/exec";
 
   const fileInput = document.getElementById('fileInput');
   const loadingSign = document.getElementById('loadingSign');
@@ -84,7 +84,7 @@
       const img = new Image();
       img.onload = function() {
         const canvas = document.createElement('canvas');
-        const MAX_WIDTH = 800; // このサイズならバーコードも文字も十分AIが読めます
+        const MAX_WIDTH = 800; 
         let width = img.width;
         let height = img.height;
 
