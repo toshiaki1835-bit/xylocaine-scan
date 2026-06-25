@@ -24,7 +24,6 @@
     .loading { color: #666; text-align: center; margin-top: 10px; display: none; }
   </style>
   <script src="https://unpkg.com/html5-qrcode"></script>
-  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 </head>
 <body>
 
@@ -49,31 +48,23 @@
   </div>
   
   <div id="reader"></div>
-  <button type="button" id="startCameraBtn">カメラを起動してスキャン</button>
+  <button type="button" id="startCameraBtn">バーコードリーダー起動</button>
   <button type="button" id="stopCameraBtn">カメラを停止</button>
 
-  <div style="text-align: center; margin-top: 10px; margin-bottom: 20px;">
-    <p style="font-size: 14px; color: #666; margin-bottom: 5px;">【リアルタイムで読みにくい場合】</p>
-    <label for="fileInput" class="file-upload-btn">カメラで写真を撮って解析する</label>
-    <input type="file" id="fileInput" accept="image/*" capture="environment" style="display: none;">
-  </div>
-
-  <div class="form-group">
-    <label for="barcodeInput">またはバーコードを手動入力／物理スキャナ利用</label>
-    <input type="text" id="barcodeInput" placeholder="読み取りデータがここに入ります" autocomplete="off">
+  <div class="form-group" style="margin-top: 20px;">
+    <label for="barcodeInput">【推奨】スマホの文字スキャンで薬品名を読み取る</label>
+    <input type="text" id="barcodeInput" placeholder="ここをタップして文字スキャンを起動" autocomplete="off">
   </div>
   
-  <button type="button" id="verifyBtn">手動で照合・記録</button>
+  <button type="button" id="verifyBtn">照合・記録する</button>
   
-  <div id="loadingSign" class="loading">スプレッドシートに記録中...</div>
+  <div id="loadingSign" class="loading">処理中...</div>
   <div id="resultBox" class="result"></div>
 </div>
 
 <script>
-  // GASのウェブアプリURL
   const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzvT58qF6-q9pumzZ4cnsgKN8jeJRcAl3JzR-CVlM_78SVZF-x8wymX2Gwft0e8DQ5N/exec";
 
-  // 正解の商品コード（GTINマスタ）
   const MASTER_GTIN = {
     "キシロカイン注1%ポリアンプル": "04987614430965", // 1% 10mL
     "キシロカイン注2%ポリアンプル": "04987614430767"  // 2% 10mL
@@ -83,93 +74,24 @@
   const verifyBtn = document.getElementById('verifyBtn');
   const startCameraBtn = document.getElementById('startCameraBtn');
   const stopCameraBtn = document.getElementById('stopCameraBtn');
-  const fileInput = document.getElementById('fileInput');
   const loadingSign = document.getElementById('loadingSign');
   let html5QrCode;
 
-  // リアルタイムカメラの起動設定
+  // バーコードリーダー（数字用）の機能はそのまま残しています
   startCameraBtn.addEventListener('click', () => {
     html5QrCode = new Html5Qrcode("reader");
-    
-    // GS1データバー用の限界突破設定（スマホ標準の強力なスキャナを呼び出す）
-    const config = { 
-      fps: 15, 
-      qrbox: { width: 300, height: 120 }, 
-      experimentalFeatures: {
-        useBarCodeDetectorIfSupported: true 
-      }
-    };
-
+    const config = { fps: 15, qrbox: { width: 300, height: 120 }, experimentalFeatures: { useBarCodeDetectorIfSupported: true } };
     html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess)
-      .then(() => {
-        startCameraBtn.style.display = "none";
-        stopCameraBtn.style.display = "block";
-      })
-      .catch((err) => {
-        alert("カメラの起動に失敗しました。ブラウザのカメラ許可設定を確認してください。");
-      });
+      .then(() => { startCameraBtn.style.display = "none"; stopCameraBtn.style.display = "block"; })
+      .catch((err) => { alert("カメラの起動に失敗しました。"); });
   });
 
   stopCameraBtn.addEventListener('click', stopCamera);
-
   function stopCamera() {
     if (html5QrCode) {
-      html5QrCode.stop().then(() => {
-        startCameraBtn.style.display = "block";
-        stopCameraBtn.style.display = "none";
-      });
+      html5QrCode.stop().then(() => { startCameraBtn.style.display = "block"; stopCameraBtn.style.display = "none"; });
     }
   }
-
-  // 写真を撮って解析する機能（バーコード＋文字読み取り）
-  fileInput.addEventListener('change', e => {
-    if (e.target.files.length == 0) return;
-    const imageFile = e.target.files[0];
-    
-    loadingSign.innerText = "バーコードを探しています...";
-    loadingSign.style.display = 'block';
-
-    if (!html5QrCode) {
-      html5QrCode = new Html5Qrcode("reader");
-    }
-
-    // まずバーコードとして読めるか挑戦
-    html5QrCode.scanFile(imageFile, true)
-      .then(decodedText => {
-        loadingSign.style.display = 'none';
-        barcodeInput.value = decodedText;
-        executeVerification();
-      })
-      .catch(err => {
-        // バーコードが読めなかった場合、下の「数字」をAIで読み取る（OCR）
-        loadingSign.innerText = "印字された数字を解析中...";
-        
-        Tesseract.recognize(
-          imageFile,
-          'eng'
-        ).then(({ data: { text } }) => {
-          loadingSign.style.display = 'none';
-          
-          // O（オー）やl（エル）を数字に変換し、空白を取り除く補正処理
-          let fixedText = text.replace(/[Oo]/g, '0').replace(/[lI]/g, '1').replace(/\s+/g, '');
-          
-          // ★(01)を完全に無視し、「049から始まる14桁」または「14桁の数字」だけを狙い撃ち抽出
-          const match = fixedText.match(/049\d{11}/) || fixedText.match(/\d{14}/);
-
-          if (match) {
-            barcodeInput.value = match[0];
-            executeVerification();
-          } else {
-            alert("画像から「049」から始まる14桁の数字を検出できませんでした。数字がくっきり見えるように再度撮影してください。");
-            fileInput.value = "";
-          }
-        }).catch(ocrErr => {
-          loadingSign.style.display = 'none';
-          alert("文字の解析に失敗しました。");
-          fileInput.value = "";
-        });
-      });
-  });
 
   function onScanSuccess(decodedText) {
     barcodeInput.value = decodedText;
@@ -192,38 +114,54 @@
     const rawCode = barcodeInput.value.trim();
     
     if (!rawCode) {
-      alert('バーコードを読み取るか入力してください。');
+      alert('薬品名やバーコードを読み取るか入力してください。');
       return;
     }
 
-    // ★入力された文字列から(01)などを無視し、「049から始まる14桁」だけを確実に取り出す
+    let recognizedDrug = ""; // "1%" か "2%" が入る
+
+    // 【1】まず、バーコードの数字(049...)が含まれているかチェック
     let gtin = "";
     const match = rawCode.match(/049\d{11}/) || rawCode.match(/\d{14}/);
-    if (match) {
-      gtin = match[0];
+    if (match) gtin = match[0];
+
+    if (gtin === MASTER_GTIN["キシロカイン注1%ポリアンプル"]) {
+      recognizedDrug = "1%";
+    } else if (gtin === MASTER_GTIN["キシロカイン注2%ポリアンプル"]) {
+      recognizedDrug = "2%";
     }
 
-    const expectedGtin = MASTER_GTIN[targetDrug];
+    // 【2】バーコードが見つからなかった場合、薬品名（文字）から推測する最強のロジック
+    if (!recognizedDrug) {
+      // スペースを消し、全角数字を半角に変換して判定しやすくする
+      const normalizedText = rawCode.replace(/\s+/g, '').replace(/[１]/g, '1').replace(/[２]/g, '2');
+      
+      if (normalizedText.includes("キシロカイン") || normalizedText.toLowerCase().includes("xylocaine")) {
+        if (normalizedText.includes("1%")) {
+          recognizedDrug = "1%";
+        } else if (normalizedText.includes("2%")) {
+          recognizedDrug = "2%";
+        }
+      }
+    }
+
+    // 【3】最終判定
     let judgment = "";
     let isSuccess = false;
+    const expectedDrug = (targetDrug === "キシロカイン注1%ポリアンプル") ? "1%" : "2%";
 
-    // 判定ロジック
-    if (!gtin) {
-      judgment = "エラー：商品コード(GTIN)検出不可";
+    if (!recognizedDrug) {
+      judgment = "エラー：薬品名または商品コードを検出できませんでした";
       isSuccess = false;
-    } else if (gtin === expectedGtin) {
+    } else if (recognizedDrug === expectedDrug) {
       judgment = "適合";
       isSuccess = true;
     } else {
-      if (gtin === MASTER_GTIN["キシロカイン注1%ポリアンプル"] || gtin === MASTER_GTIN["キシロカイン注2%ポリアンプル"]) {
-        judgment = "不適合：濃度間違い";
-      } else {
-        judgment = "不適合：他剤（製品間違い）";
-      }
+      judgment = "不適合：濃度間違い";
       isSuccess = false;
     }
 
-    showResult(judgment === "適合" ? "【適合】正しい医薬品です" : "【警告】" + judgment, isSuccess);
+    showResult(judgment === "適合" ? "【適合】正しいキシロカインです" : "【警告】" + judgment, isSuccess);
 
     loadingSign.innerText = "スプレッドシートに記録中...";
     loadingSign.style.display = 'block';
@@ -231,16 +169,13 @@
     const payload = {
       operator: operator,
       targetDrug: targetDrug,
-      scannedCode: gtin || rawCode, // 抽出できた場合はGTINのみを、できなかった場合は生データを記録
+      scannedCode: rawCode,
       judgment: judgment
     };
 
-    // GASへデータを送信（スマホからの通信ブロック回避設定）
     fetch(GAS_WEB_APP_URL, {
       method: 'POST',
-      headers: {
-        "Content-Type": "text/plain;charset=utf-8"
-      },
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
       redirect: "follow",
       body: JSON.stringify(payload)
     })
@@ -250,12 +185,12 @@
       if (data.status === 'success') {
         barcodeInput.value = "";
       } else {
-        alert('サーバー側でエラーが発生しました: ' + data.message);
+        alert('サーバーエラー: ' + data.message);
       }
     })
     .catch(error => {
       loadingSign.style.display = 'none';
-      alert('通信エラーが発生しました。スマホの通信環境を確認してください。');
+      alert('通信エラーが発生しました。');
     });
   }
 
