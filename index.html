@@ -1,35 +1,34 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>キシロカイン QRスキャン</title>
-<style>
-  body { font-family: sans-serif; margin: 20px; background-color: #f5f5f5; color: #333; }
-  .container { max-width: 500px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-  h2 { text-align: center; color: #2c3e50; margin-bottom: 20px; }
-  .form-group { margin-bottom: 15px; }
-  label { display: block; font-weight: bold; margin-bottom: 5px; }
-  select, input[type="text"] { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-size: 16px; }
-  button { width: 100%; padding: 12px; background-color: #3498db; color: white; border: none; border-radius: 4px; font-size: 16px; cursor: pointer; font-weight: bold; margin-bottom: 10px;}
-  button:hover { background-color: #2980b9; }
-  button:disabled { background-color: #95a5a6; cursor: not-allowed; }
-  #stopCameraBtn { background-color: #e74c3c; display: none; }
-  #stopCameraBtn:hover { background-color: #c0392b; }
-  #reader { width: 100%; margin-bottom: 15px; }
-  .result { margin-top: 20px; padding: 15px; border-radius: 4px; text-align: center; font-weight: bold; font-size: 16px; display: none; white-space: pre-line; }
-  .match { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
-  .mismatch { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
-  .loading { color: #666; text-align: center; margin-top: 10px; display: none; }
-  .libStatus { color: #999; text-align: center; font-size: 13px; margin-top: -5px; margin-bottom: 10px; }
-</style>
-<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>キシロカイン照合システム (AIクラウド解析版)</title>
+  <style>
+    body { font-family: sans-serif; margin: 20px; background-color: #f5f5f5; color: #333; }
+    .container { max-width: 500px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    h2 { text-align: center; color: #2c3e50; margin-bottom: 20px; font-size: 22px; }
+    .form-group { margin-bottom: 15px; }
+    label { display: block; font-weight: bold; margin-bottom: 5px; }
+    select, input[type="text"] { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-size: 16px; }
+    button { width: 100%; padding: 12px; border: none; border-radius: 4px; font-size: 16px; cursor: pointer; font-weight: bold; margin-bottom: 10px; }
+    .btn-blue { background-color: #3498db; color: white; }
+    .btn-blue:hover { background-color: #2980b9; }
+    
+    .file-upload-btn { display: inline-block; width: 100%; padding: 20px 10px; background-color: #27ae60; color: white; border-radius: 8px; font-size: 18px; cursor: pointer; font-weight: bold; text-align: center; box-sizing: border-box; margin-bottom: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+    .file-upload-btn:hover { background-color: #2ecc71; }
+    
+    .result { margin-top: 20px; padding: 15px; border-radius: 4px; text-align: center; font-weight: bold; font-size: 18px; display: none; }
+    .match { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+    .mismatch { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+    .loading { color: #333; text-align: center; margin-top: 15px; display: none; font-weight: bold; background-color: #fff3cd; padding: 10px; border-radius: 4px;}
+  </style>
 </head>
 <body>
 
 <div class="container">
-  <h2>キシロカイン QRスキャン</h2>
-
+  <h2>キシロカイン照合システム<br><small style="font-size: 14px; color: #666;">(AIクラウド解析版)</small></h2>
+  
   <div class="form-group">
     <label for="operator">作業者</label>
     <select id="operator">
@@ -38,7 +37,7 @@
       <option value="看護師C">看護師C</option>
     </select>
   </div>
-
+  
   <div class="form-group">
     <label for="targetDrug">確認対象の指示</label>
     <select id="targetDrug">
@@ -46,215 +45,116 @@
       <option value="キシロカイン注2%ポリアンプル">キシロカイン注2% 10mL</option>
     </select>
   </div>
-
-  <div id="reader"></div>
-  <div id="libStatus" class="libStatus">ライブラリ読み込み中...</div>
-  <button type="button" id="startCameraBtn" disabled>カメラを起動してスキャン</button>
-  <button type="button" id="stopCameraBtn">カメラを停止</button>
-
-  <div class="form-group">
-    <label for="barcodeInput">またはバーコードを手動入力</label>
-    <input type="text" id="barcodeInput" placeholder="読み取りデータがここに入ります" autocomplete="off">
+  
+  <div class="form-group" style="margin-top: 25px;">
+    <label for="fileInput" class="file-upload-btn">📷 写真を撮ってAIで照合する</label>
+    <input type="file" id="fileInput" accept="image/*" capture="environment" style="display: none;">
   </div>
 
-  <button type="button" id="verifyBtn">手動で照合・送信</button>
+  <hr style="margin: 25px 0; border: 0; border-top: 2px dashed #ccc;">
 
-  <div id="loadingSign" class="loading">送信中...</div>
+  <div class="form-group">
+    <label for="barcodeInput">またはバーコード手動入力（スキャナ用）</label>
+    <input type="text" id="barcodeInput" placeholder="バーコードデータ" autocomplete="off">
+  </div>
+  <button type="button" id="verifyBtn" class="btn-blue">手動照合・記録</button>
+  
+  <div id="loadingSign" class="loading">画像をAIサーバーに送信中...<br>（数秒かかります）</div>
   <div id="resultBox" class="result"></div>
 </div>
 
 <script>
-  const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxzrOfz3-u8bDch5956en3L3hokRf7cFBuD3pJv32lY3Ll87cSfHteTGHKo5a1oYf5M/exec";
-  const SHARED_SECRET = "xyl-2026-secret";
+  // 【自動設定済み】ご提示いただいたGASのウェブアプリURL
+  const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzvT58qF6-q9pumzZ4cnsgKN8jeJRcAl3JzR-CVlM_78SVZF-x8wymX2Gwft0e8DQ5N/exec";
 
-  const MASTER_GTIN = {
-    "キシロカイン注1%ポリアンプル": "04987614430965",
-    "キシロカイン注2%ポリアンプル": "04987614430767"
-  };
+  const fileInput = document.getElementById('fileInput');
+  const loadingSign = document.getElementById('loadingSign');
 
-  const MASTER_NAME_PATTERNS = {
-    "キシロカイン注1%ポリアンプル": [/キシロカイン/, /1\s*%/],
-    "キシロカイン注2%ポリアンプル": [/キシロカイン/, /2\s*%/]
-  };
+  // 写真が撮影された時の処理
+  fileInput.addEventListener('change', e => {
+    if (e.target.files.length === 0) return;
+    const file = e.target.files[0];
 
-  const barcodeInput = document.getElementById('barcodeInput');
-  const verifyBtn = document.getElementById('verifyBtn');
-  const startCameraBtn = document.getElementById('startCameraBtn');
-  const stopCameraBtn = document.getElementById('stopCameraBtn');
-  const libStatus = document.getElementById('libStatus');
-  let html5QrCode;
+    loadingSign.innerHTML = "画像を圧縮中...";
+    loadingSign.style.display = 'block';
 
-  window.addEventListener('load', () => {
-    if (typeof Html5Qrcode === 'undefined') {
-      libStatus.innerText = 'ライブラリの読み込みに失敗しました。再読み込みしてください。';
-      libStatus.style.color = '#e74c3c';
-      startCameraBtn.disabled = true;
-    } else {
-      libStatus.style.display = 'none';
-      startCameraBtn.disabled = false;
+    // GASに送れるサイズに画像を圧縮（クラッシュ防止対策）
+    const reader = new FileReader();
+    reader.onload = function(event) {
+      const img = new Image();
+      img.onload = function() {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 800; 
+        let width = img.width;
+        let height = img.height;
+
+        if (width > MAX_WIDTH) {
+          height = Math.round((height * MAX_WIDTH) / width);
+          width = MAX_WIDTH;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // 画像を文字列(Base64)に変換して送信
+        const base64Str = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
+
+        loadingSign.innerHTML = "Google AIで解析・記録中...<br>（3〜5秒ほどお待ちください）";
+        sendToGAS("image", null, base64Str);
+      }
+      img.src = event.target.result;
     }
+    reader.readAsDataURL(file);
+    fileInput.value = ""; // リセット
   });
 
-  startCameraBtn.addEventListener('click', () => {
-    if (typeof Html5Qrcode === 'undefined') {
-      alert('カメラライブラリの読み込みに失敗しました。ページを再読み込みしてから再度お試しください。');
+  // 手動入力・スキャナの処理
+  document.getElementById('verifyBtn').addEventListener('click', () => {
+    const rawCode = document.getElementById('barcodeInput').value.trim();
+    if (!rawCode) {
+      alert('データを入力してください。');
       return;
     }
-
-    html5QrCode = new Html5Qrcode("reader");
-    const config = { fps: 10, qrbox: { width: 250, height: 100 } };
-
-    html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess)
-      .then(() => {
-        startCameraBtn.style.display = "none";
-        stopCameraBtn.style.display = "block";
-      })
-      .catch((err) => {
-        alert("カメラの起動に失敗しました。ブラウザのカメラ許可設定を確認してください。\nエラー詳細: " + err);
-      });
+    loadingSign.innerHTML = "照合・記録中...";
+    loadingSign.style.display = 'block';
+    sendToGAS("text", rawCode, null);
   });
 
-  stopCameraBtn.addEventListener('click', stopCamera);
-
-  function stopCamera() {
-    if (html5QrCode) {
-      html5QrCode.stop().then(() => {
-        startCameraBtn.style.display = "block";
-        stopCameraBtn.style.display = "none";
-      });
-    }
-  }
-
-  function onScanSuccess(decodedText) {
-    barcodeInput.value = decodedText;
-    stopCamera();
-    executeVerification();
-  }
-
-  barcodeInput.addEventListener('keypress', function(e) {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      executeVerification();
-    }
-  });
-
-  verifyBtn.addEventListener('click', executeVerification);
-
-  function digitsOnly(str) {
-    return str.replace(/\D/g, "");
-  }
-
-  function normalizeToGtin14(digits) {
-    if (digits.length === 14) return digits;
-    if (digits.length === 13) return "0" + digits;
-    if (digits.length === 12) return "00" + digits;
-    if (digits.length === 8)  return "000000" + digits;
-    return digits;
-  }
-
-  function extractGtin(rawCode) {
-    const code = rawCode.trim();
-
-    const aiMatch = code.match(/\(?01\)?\s*(\d{14})/);
-    if (aiMatch) return aiMatch[1];
-
-    const allDigits = digitsOnly(code);
-
-    if (allDigits.startsWith("01") && allDigits.length >= 16) {
-      return allDigits.substring(2, 16);
-    }
-
-    const m14 = allDigits.match(/\d{14}/);
-    if (m14) return m14[0];
-
-    const m13 = allDigits.match(/\d{13}/);
-    if (m13) return "0" + m13[0];
-
-    if (allDigits.length > 0) return normalizeToGtin14(allDigits);
-
-    return "";
-  }
-
-  function matchByName(rawCode) {
-    for (const name in MASTER_NAME_PATTERNS) {
-      const patterns = MASTER_NAME_PATTERNS[name];
-      if (patterns.every(p => p.test(rawCode))) {
-        return name;
-      }
-    }
-    return null;
-  }
-
-  function identifyDrug(rawCode) {
-    const gtin = extractGtin(rawCode);
-
-    if (gtin) {
-      for (const name in MASTER_GTIN) {
-        if (MASTER_GTIN[name] === gtin) {
-          return { matchedName: name, matchedBy: "GTIN番号", gtin: gtin };
-        }
-      }
-    }
-
-    const nameMatch = matchByName(rawCode);
-    if (nameMatch) {
-      return { matchedName: nameMatch, matchedBy: "薬品名テキスト", gtin: gtin || null };
-    }
-
-    return { matchedName: null, matchedBy: null, gtin: gtin || null };
-  }
-
-  function executeVerification() {
+  // GASへデータを送信する共通処理
+  function sendToGAS(mode, scannedCode, imageBase64) {
     const operator = document.getElementById('operator').value;
     const targetDrug = document.getElementById('targetDrug').value;
-    const rawCode = barcodeInput.value.trim();
 
-    if (!rawCode) {
-      alert('バーコードを読み取るか入力してください。');
-      return;
-    }
-
-    const result = identifyDrug(rawCode);
-    let judgment = "";
-    let isSuccess = false;
-
-    if (result.matchedName === targetDrug) {
-      judgment = "適合";
-      isSuccess = true;
-    } else if (result.matchedName) {
-      judgment = "不適合：濃度間違い（検出: " + result.matchedName + "）";
-    } else {
-      judgment = "不適合：他剤または読み取り不能（登録外の製品）";
-    }
-
-    const debugInfo = "\n[読取値: " + rawCode +
-      (result.gtin ? " / GTIN: " + result.gtin : "") +
-      (result.matchedBy ? " / 判定方法: " + result.matchedBy : "") + "]";
-
-    showResult((isSuccess ? "【適合】正しい医薬品です" : "【警告】" + judgment) + debugInfo, isSuccess);
-    sendToSheet(operator, targetDrug, rawCode, judgment);
-  }
-
-  function sendToSheet(operator, targetDrug, scannedCode, judgment) {
-    document.getElementById('loadingSign').style.display = 'block';
+    const payload = {
+      operator: operator,
+      targetDrug: targetDrug,
+      mode: mode,
+      scannedCode: scannedCode,
+      imageBase64: imageBase64
+    };
 
     fetch(GAS_WEB_APP_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ secret: SHARED_SECRET, operator, targetDrug, scannedCode, judgment })
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      redirect: "follow",
+      body: JSON.stringify(payload)
     })
-      .then(res => res.json())
-      .then(data => {
-        document.getElementById('loadingSign').style.display = 'none';
-        if (data.status !== 'success') {
-          alert('記録に失敗しました: ' + (data.message || '不明なエラー'));
-        }
-        barcodeInput.value = "";
-      })
-      .catch(err => {
-        document.getElementById('loadingSign').style.display = 'none';
-        alert('スプレッドシートへの記録に失敗しました: ' + err);
-      });
+    .then(response => response.json())
+    .then(data => {
+      loadingSign.style.display = 'none';
+      if (data.status === 'success') {
+        showResult(data.isSuccess ? "【適合】正しい薬剤です" : "【警告】" + data.judgment, data.isSuccess);
+        document.getElementById('barcodeInput').value = "";
+      } else {
+        alert('サーバーエラー: ' + data.message);
+      }
+    })
+    .catch(error => {
+      loadingSign.style.display = 'none';
+      alert('通信エラーが発生しました。GASの新しいデプロイ設定が反映されているか確認してください。');
+    });
   }
 
   function showResult(message, isSuccess) {
