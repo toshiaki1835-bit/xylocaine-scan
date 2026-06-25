@@ -15,6 +15,8 @@
     button:hover { background-color: #2980b9; }
     #stopCameraBtn { background-color: #e74c3c; display: none; }
     #stopCameraBtn:hover { background-color: #c0392b; }
+    .file-upload-btn { display: inline-block; width: 100%; padding: 12px; background-color: #27ae60; color: white; border-radius: 4px; font-size: 16px; cursor: pointer; font-weight: bold; text-align: center; box-sizing: border-box; margin-bottom: 10px; }
+    .file-upload-btn:hover { background-color: #2ecc71; }
     #reader { width: 100%; margin-bottom: 15px; }
     .result { margin-top: 20px; padding: 15px; border-radius: 4px; text-align: center; font-weight: bold; font-size: 18px; display: none; }
     .match { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
@@ -49,6 +51,12 @@
   <button type="button" id="startCameraBtn">カメラを起動してスキャン</button>
   <button type="button" id="stopCameraBtn">カメラを停止</button>
 
+  <div style="text-align: center; margin-top: 10px; margin-bottom: 20px;">
+    <p style="font-size: 14px; color: #666; margin-bottom: 5px;">【リアルタイムで読みにくい場合】</p>
+    <label for="fileInput" class="file-upload-btn">カメラで写真を撮って解析する</label>
+    <input type="file" id="fileInput" accept="image/*" capture="environment" style="display: none;">
+  </div>
+
   <div class="form-group">
     <label for="barcodeInput">またはバーコードを手動入力／物理スキャナ利用</label>
     <input type="text" id="barcodeInput" placeholder="読み取りデータがここに入ります" autocomplete="off">
@@ -61,10 +69,10 @@
 </div>
 
 <script>
-  // 【設定済み】ご提供いただいたGASのウェブアプリURL
+  // 【自動設定済み】ご提供いただいた新しいGASのウェブアプリURL
   const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzvT58qF6-q9pumzZ4cnsgKN8jeJRcAl3JzR-CVlM_78SVZF-x8wymX2Gwft0e8DQ5N/exec";
 
-  // 提供いただいた正確な10mLポリアンプルのGTINコード
+  // 正確な10mLポリアンプルのGTINマスタ
   const MASTER_GTIN = {
     "キシロカイン注1%ポリアンプル": "04987614430965", // 1% 10mL
     "キシロカイン注2%ポリアンプル": "04987614430767"  // 2% 10mL
@@ -74,11 +82,20 @@
   const verifyBtn = document.getElementById('verifyBtn');
   const startCameraBtn = document.getElementById('startCameraBtn');
   const stopCameraBtn = document.getElementById('stopCameraBtn');
+  const fileInput = document.getElementById('fileInput');
   let html5QrCode;
 
   startCameraBtn.addEventListener('click', () => {
     html5QrCode = new Html5Qrcode("reader");
-    const config = { fps: 10, qrbox: { width: 250, height: 100 } };
+    
+    // GS1データバー（医療用）向けの最適化およびネイティブスキャン呼び出し設定
+    const config = { 
+      fps: 15, 
+      qrbox: { width: 300, height: 120 }, 
+      experimentalFeatures: {
+        useBarCodeDetectorIfSupported: true // 対応端末（主にAndroid+Chrome）で内蔵スキャナを強制起動
+      }
+    };
 
     html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess)
       .then(() => {
@@ -100,6 +117,33 @@
       });
     }
   }
+
+  // 静止画（高画質写真）から読み取るバックアップ機能
+  fileInput.addEventListener('change', e => {
+    if (e.target.files.length == 0) return;
+    const imageFile = e.target.files[0];
+    
+    document.getElementById('loadingSign').innerText = "画像を解析中...";
+    document.getElementById('loadingSign').style.display = 'block';
+
+    if (!html5QrCode) {
+      html5QrCode = new Html5Qrcode("reader");
+    }
+
+    html5QrCode.scanFile(imageFile, true)
+      .then(decodedText => {
+        document.getElementById('loadingSign').style.display = 'none';
+        document.getElementById('loadingSign').innerText = "スプレッドシートに記録中...";
+        barcodeInput.value = decodedText;
+        executeVerification();
+      })
+      .catch(err => {
+        document.getElementById('loadingSign').style.display = 'none';
+        document.getElementById('loadingSign').innerText = "スプレッドシートに記録中...（準備）";
+        alert("画像からバーコードを検出できませんでした。ピントを合わせて、明るい場所でもう一度撮影してください。");
+        fileInput.value = "";
+      });
+  });
 
   function onScanSuccess(decodedText) {
     barcodeInput.value = decodedText;
@@ -126,6 +170,7 @@
       return;
     }
 
+    // GS1データバーおよび各形式からGTIN（14桁の数字）を切り出すロジック
     let gtin = "";
     if (rawCode.includes("(01)")) {
       const idx = rawCode.indexOf("(01)");
@@ -146,7 +191,7 @@
     let judgment = "";
     let isSuccess = false;
 
-    // 判定ロジック：GTINが見つからない場合もエラーとして記録するように変更
+    // 商品コードがうまく判定できなかった場合でも記録を残す
     if (!gtin) {
       judgment = "エラー：商品コード(GTIN)検出不可";
       isSuccess = false;
@@ -164,6 +209,7 @@
 
     showResult(judgment === "適合" ? "【適合】正しい医薬品です" : "【警告】" + judgment, isSuccess);
 
+    document.getElementById('loadingSign').innerText = "スプレッドシートに記録中...";
     document.getElementById('loadingSign').style.display = 'block';
 
     const payload = {
@@ -173,9 +219,13 @@
       judgment: judgment
     };
 
-    // GASへデータを送信
+    // スマートフォンからのPOST送信を確実にスプレッドシートへ通すための設定
     fetch(GAS_WEB_APP_URL, {
       method: 'POST',
+      headers: {
+        "Content-Type": "text/plain;charset=utf-8"
+      },
+      redirect: "follow",
       body: JSON.stringify(payload)
     })
     .then(response => response.json())
@@ -189,7 +239,7 @@
     })
     .catch(error => {
       document.getElementById('loadingSign').style.display = 'none';
-      alert('通信エラーが発生しました。GASのデプロイ公開設定（全員）を確認してください。');
+      alert('通信エラーが発生しました。GASの公開設定が「全員(Anyone)」になっているか再度確認してください。');
     });
   }
 
