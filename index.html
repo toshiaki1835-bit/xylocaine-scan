@@ -64,7 +64,7 @@
 </div>
 
 <script>
-  // 【自動設定済み】ご提示いただいたGASのウェブアプリURL
+  // ▼ ご提示いただいた最新のGASのURLをセットしました
   const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzvT58qF6-q9pumzZ4cnsgKN8jeJRcAl3JzR-CVlM_78SVZF-x8wymX2Gwft0e8DQ5N/exec";
 
   const fileInput = document.getElementById('fileInput');
@@ -78,13 +78,13 @@
     loadingSign.innerHTML = "画像を圧縮中...";
     loadingSign.style.display = 'block';
 
-    // GASに送れるサイズに画像を圧縮（クラッシュ防止対策）
+    // GASに送れるサイズに画像を圧縮
     const reader = new FileReader();
     reader.onload = function(event) {
       const img = new Image();
       img.onload = function() {
         const canvas = document.createElement('canvas');
-        const MAX_WIDTH = 800; 
+        const MAX_WIDTH = 800; // このサイズならバーコードも文字も十分AIが読めます
         let width = img.width;
         let height = img.height;
 
@@ -153,7 +153,7 @@
     })
     .catch(error => {
       loadingSign.style.display = 'none';
-      alert('通信エラーが発生しました。GASの新しいデプロイ設定が反映されているか確認してください。');
+      alert('通信エラーが発生しました。インターネット接続を確認してください。');
     });
   }
 
