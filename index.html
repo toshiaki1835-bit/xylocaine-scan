@@ -53,9 +53,17 @@
 </div>
 
 <script>
+  // GTINでの照合用マスター
   const MASTER_GTIN = {
     "キシロカイン注1%ポリアンプル": "04987614430965",
     "キシロカイン注2%ポリアンプル": "04987614430767"
+  };
+
+  // 薬品名（テキスト）での照合用マスター
+  // 「すべての条件（正規表現）に一致したら、その薬剤とみなす」というルールです
+  const MASTER_NAME_PATTERNS = {
+    "キシロカイン注1%ポリアンプル": [/キシロカイン/, /1\s*%/],
+    "キシロカイン注2%ポリアンプル": [/キシロカイン/, /2\s*%/]
   };
 
   const barcodeInput = document.getElementById('barcodeInput');
@@ -78,9 +86,9 @@
   // 桁数に応じてGTIN-14形式に正規化する
   function normalizeToGtin14(digits) {
     if (digits.length === 14) return digits;
-    if (digits.length === 13) return "0" + digits;       // JAN-13 → GTIN-14
-    if (digits.length === 12) return "00" + digits;       // UPC-12 → GTIN-14
-    if (digits.length === 8)  return "000000" + digits;   // GTIN-8 → GTIN-14
+    if (digits.length === 13) return "0" + digits;
+    if (digits.length === 12) return "00" + digits;
+    if (digits.length === 8)  return "000000" + digits;
     return digits;
   }
 
@@ -88,29 +96,58 @@
   function extractGtin(rawCode) {
     const code = rawCode.trim();
 
-    // GS1の(01)表記がある場合
     const aiMatch = code.match(/\(?01\)?\s*(\d{14})/);
     if (aiMatch) return aiMatch[1];
 
     const allDigits = digitsOnly(code);
 
-    // "01"始まりのAIコードが括弧なしで連結されている場合
     if (allDigits.startsWith("01") && allDigits.length >= 16) {
       return allDigits.substring(2, 16);
     }
 
-    // 14桁の並びを探す
     const m14 = allDigits.match(/\d{14}/);
     if (m14) return m14[0];
 
-    // 13桁の並びを探し、14桁形式に変換
     const m13 = allDigits.match(/\d{13}/);
     if (m13) return "0" + m13[0];
 
-    // それ以外、数字だけの入力ならそのまま正規化
     if (allDigits.length > 0) return normalizeToGtin14(allDigits);
 
     return "";
+  }
+
+  // 薬品名のパターンと一致するか確認する
+  function matchByName(rawCode) {
+    for (const name in MASTER_NAME_PATTERNS) {
+      const patterns = MASTER_NAME_PATTERNS[name];
+      if (patterns.every(p => p.test(rawCode))) {
+        return name;
+      }
+    }
+    return null;
+  }
+
+  // GTIN・薬品名の両方を試し、どちらかで一致した薬剤名を返す
+  function identifyDrug(rawCode) {
+    const gtin = extractGtin(rawCode);
+
+    // 1. まずGTIN（数字）で照合
+    if (gtin) {
+      for (const name in MASTER_GTIN) {
+        if (MASTER_GTIN[name] === gtin) {
+          return { matchedName: name, matchedBy: "GTIN番号", gtin: gtin };
+        }
+      }
+    }
+
+    // 2. 数字で一致しなければ、薬品名（テキスト）で照合
+    const nameMatch = matchByName(rawCode);
+    if (nameMatch) {
+      return { matchedName: nameMatch, matchedBy: "薬品名テキスト", gtin: gtin || null };
+    }
+
+    // 3. どちらも一致しなかった
+    return { matchedName: null, matchedBy: null, gtin: gtin || null };
   }
 
   function executeVerification() {
@@ -123,33 +160,23 @@
       return;
     }
 
-    const gtin = extractGtin(rawCode);
-
-    if (!gtin) {
-      showResult("商品コード(GTIN)を検出できませんでした\n読み取り値: " + rawCode, false);
-      return;
-    }
-
-    // 読み取ったGTINが、登録されているどの薬剤と一致するか確認（診断用）
-    let matchedDrugName = null;
-    for (const name in MASTER_GTIN) {
-      if (MASTER_GTIN[name] === gtin) { matchedDrugName = name; break; }
-    }
-
-    const expectedGtin = MASTER_GTIN[targetDrug];
+    const result = identifyDrug(rawCode);
     let judgment = "";
     let isSuccess = false;
 
-    if (gtin === expectedGtin) {
+    if (result.matchedName === targetDrug) {
       judgment = "適合";
       isSuccess = true;
-    } else if (matchedDrugName) {
-      judgment = "不適合：濃度間違い（" + matchedDrugName + "）";
+    } else if (result.matchedName) {
+      judgment = "不適合：濃度間違い（検出: " + result.matchedName + "）";
     } else {
-      judgment = "不適合：他剤（登録外の製品）";
+      judgment = "不適合：他剤または読み取り不能（登録外の製品）";
     }
 
-    const debugInfo = "\n[読取値: " + rawCode + " / 検出GTIN: " + gtin + "]";
+    const debugInfo = "\n[読取値: " + rawCode +
+      (result.gtin ? " / GTIN: " + result.gtin : "") +
+      (result.matchedBy ? " / 判定方法: " + result.matchedBy : "") + "]";
+
     showResult((isSuccess ? "【適合】正しい医薬品です" : "【警告】" + judgment) + debugInfo, isSuccess);
 
     document.getElementById('loadingSign').style.display = 'block';
@@ -176,3 +203,4 @@
 
 </body>
 </html>
+   
