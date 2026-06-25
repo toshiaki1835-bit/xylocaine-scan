@@ -24,6 +24,7 @@
     .loading { color: #666; text-align: center; margin-top: 10px; display: none; }
   </style>
   <script src="https://unpkg.com/html5-qrcode"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 </head>
 <body>
 
@@ -69,10 +70,10 @@
 </div>
 
 <script>
-  // 【自動設定済み】ご提供いただいた新しいGASのウェブアプリURL
+  // GASのウェブアプリURL
   const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzvT58qF6-q9pumzZ4cnsgKN8jeJRcAl3JzR-CVlM_78SVZF-x8wymX2Gwft0e8DQ5N/exec";
 
-  // 正確な10mLポリアンプルのGTINマスタ
+  // 正解の商品コード（GTINマスタ）
   const MASTER_GTIN = {
     "キシロカイン注1%ポリアンプル": "04987614430965", // 1% 10mL
     "キシロカイン注2%ポリアンプル": "04987614430767"  // 2% 10mL
@@ -83,17 +84,19 @@
   const startCameraBtn = document.getElementById('startCameraBtn');
   const stopCameraBtn = document.getElementById('stopCameraBtn');
   const fileInput = document.getElementById('fileInput');
+  const loadingSign = document.getElementById('loadingSign');
   let html5QrCode;
 
+  // リアルタイムカメラの起動設定
   startCameraBtn.addEventListener('click', () => {
     html5QrCode = new Html5Qrcode("reader");
     
-    // GS1データバー（医療用）向けの最適化およびネイティブスキャン呼び出し設定
+    // GS1データバー用の限界突破設定（スマホ標準の強力なスキャナを呼び出す）
     const config = { 
       fps: 15, 
       qrbox: { width: 300, height: 120 }, 
       experimentalFeatures: {
-        useBarCodeDetectorIfSupported: true // 対応端末（主にAndroid+Chrome）で内蔵スキャナを強制起動
+        useBarCodeDetectorIfSupported: true 
       }
     };
 
@@ -118,30 +121,53 @@
     }
   }
 
-  // 静止画（高画質写真）から読み取るバックアップ機能
+  // 写真を撮って解析する機能（バーコード＋文字読み取り）
   fileInput.addEventListener('change', e => {
     if (e.target.files.length == 0) return;
     const imageFile = e.target.files[0];
     
-    document.getElementById('loadingSign').innerText = "画像を解析中...";
-    document.getElementById('loadingSign').style.display = 'block';
+    loadingSign.innerText = "バーコードを探しています...";
+    loadingSign.style.display = 'block';
 
     if (!html5QrCode) {
       html5QrCode = new Html5Qrcode("reader");
     }
 
+    // まずバーコードとして読めるか挑戦
     html5QrCode.scanFile(imageFile, true)
       .then(decodedText => {
-        document.getElementById('loadingSign').style.display = 'none';
-        document.getElementById('loadingSign').innerText = "スプレッドシートに記録中...";
+        loadingSign.style.display = 'none';
         barcodeInput.value = decodedText;
         executeVerification();
       })
       .catch(err => {
-        document.getElementById('loadingSign').style.display = 'none';
-        document.getElementById('loadingSign').innerText = "スプレッドシートに記録中...（準備）";
-        alert("画像からバーコードを検出できませんでした。ピントを合わせて、明るい場所でもう一度撮影してください。");
-        fileInput.value = "";
+        // バーコードが読めなかった場合、下の「数字」をAIで読み取る（OCR）
+        loadingSign.innerText = "印字された数字を解析中...";
+        
+        Tesseract.recognize(
+          imageFile,
+          'eng'
+        ).then(({ data: { text } }) => {
+          loadingSign.style.display = 'none';
+          
+          // O（オー）やl（エル）を数字に変換し、空白を取り除く補正処理
+          let fixedText = text.replace(/[Oo]/g, '0').replace(/[lI]/g, '1').replace(/\s+/g, '');
+          
+          // ★(01)を完全に無視し、「049から始まる14桁」または「14桁の数字」だけを狙い撃ち抽出
+          const match = fixedText.match(/049\d{11}/) || fixedText.match(/\d{14}/);
+
+          if (match) {
+            barcodeInput.value = match[0];
+            executeVerification();
+          } else {
+            alert("画像から「049」から始まる14桁の数字を検出できませんでした。数字がくっきり見えるように再度撮影してください。");
+            fileInput.value = "";
+          }
+        }).catch(ocrErr => {
+          loadingSign.style.display = 'none';
+          alert("文字の解析に失敗しました。");
+          fileInput.value = "";
+        });
       });
   });
 
@@ -170,28 +196,18 @@
       return;
     }
 
-    // GS1データバーおよび各形式からGTIN（14桁の数字）を切り出すロジック
+    // ★入力された文字列から(01)などを無視し、「049から始まる14桁」だけを確実に取り出す
     let gtin = "";
-    if (rawCode.includes("(01)")) {
-      const idx = rawCode.indexOf("(01)");
-      gtin = rawCode.substring(idx + 4, idx + 18);
-    } else if (rawCode.startsWith("01") && rawCode.length >= 16) {
-      gtin = rawCode.substring(2, 16);
-    } else {
-      const match = rawCode.match(/049\d{11}/);
-      if (match) {
-        gtin = match[0];
-      } else {
-        const genericMatch = rawCode.match(/\d{14}/);
-        if (genericMatch) gtin = genericMatch[0];
-      }
+    const match = rawCode.match(/049\d{11}/) || rawCode.match(/\d{14}/);
+    if (match) {
+      gtin = match[0];
     }
 
     const expectedGtin = MASTER_GTIN[targetDrug];
     let judgment = "";
     let isSuccess = false;
 
-    // 商品コードがうまく判定できなかった場合でも記録を残す
+    // 判定ロジック
     if (!gtin) {
       judgment = "エラー：商品コード(GTIN)検出不可";
       isSuccess = false;
@@ -209,17 +225,17 @@
 
     showResult(judgment === "適合" ? "【適合】正しい医薬品です" : "【警告】" + judgment, isSuccess);
 
-    document.getElementById('loadingSign').innerText = "スプレッドシートに記録中...";
-    document.getElementById('loadingSign').style.display = 'block';
+    loadingSign.innerText = "スプレッドシートに記録中...";
+    loadingSign.style.display = 'block';
 
     const payload = {
       operator: operator,
       targetDrug: targetDrug,
-      scannedCode: rawCode,
+      scannedCode: gtin || rawCode, // 抽出できた場合はGTINのみを、できなかった場合は生データを記録
       judgment: judgment
     };
 
-    // スマートフォンからのPOST送信を確実にスプレッドシートへ通すための設定
+    // GASへデータを送信（スマホからの通信ブロック回避設定）
     fetch(GAS_WEB_APP_URL, {
       method: 'POST',
       headers: {
@@ -230,7 +246,7 @@
     })
     .then(response => response.json())
     .then(data => {
-      document.getElementById('loadingSign').style.display = 'none';
+      loadingSign.style.display = 'none';
       if (data.status === 'success') {
         barcodeInput.value = "";
       } else {
@@ -238,8 +254,8 @@
       }
     })
     .catch(error => {
-      document.getElementById('loadingSign').style.display = 'none';
-      alert('通信エラーが発生しました。GASの公開設定が「全員(Anyone)」になっているか再度確認してください。');
+      loadingSign.style.display = 'none';
+      alert('通信エラーが発生しました。スマホの通信環境を確認してください。');
     });
   }
 
