@@ -87,8 +87,7 @@
 </div>
 
 <script>
-  // ★★https://script.google.com/macros/s/AKfycbxr1RMmxzBAdHkvt2W0Z_BUSqhNfeT2DhsTzT0UGqS_JwjwwjZupmf8TzSuV5VsoWsl4g/execてください★★
-  // （GASをデプロイした後に発行される "https://script.google.com/macros/s/...exec" のURL）
+  // GASをデプロイした後に発行される "https://script.google.com/macros/s/...exec" のURL
   const GAS_URL = "https://script.google.com/macros/s/AKfycbxr1RMmxzBAdHkvt2W0Z_BUSqhNfeT2DhsTzT0UGqS_JwjwwjZupmf8TzSuV5VsoWsl4g/exec";
 
   const fileInput   = document.getElementById('fileInput');
@@ -145,12 +144,12 @@
       loadingSign.style.display = 'none';
       if (data.status === 'success') {
         showResult(
-          data.isSuccess ? "【適合】正しい薬剤です" : "【警告】" + data.judgment,
+          data.isSuccess ? "【適合】正しい薬剤です" : "【警告】薬品名が違います",
           data.isSuccess
         );
         document.getElementById('barcodeInput').value = "";
       } else {
-        alert('サーバーエラー：' + data.message);
+        showResult("サーバーエラー：" + data.message, false);
       }
     })
     .catch(function() {
