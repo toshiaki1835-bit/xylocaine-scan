@@ -46,6 +46,7 @@
     </select>
   </div>
   
+  <!-- AI画像解析ボタン -->
   <div class="form-group" style="margin-top: 25px;">
     <label for="fileInput" class="file-upload-btn">📷 写真を撮ってAIで照合する</label>
     <input type="file" id="fileInput" accept="image/*" capture="environment" style="display: none;">
@@ -53,6 +54,7 @@
 
   <hr style="margin: 25px 0; border: 0; border-top: 2px dashed #ccc;">
 
+  <!-- 物理スキャナ・手入力用 -->
   <div class="form-group">
     <label for="barcodeInput">またはバーコード手動入力（スキャナ用）</label>
     <input type="text" id="barcodeInput" placeholder="バーコードデータ" autocomplete="off">
@@ -64,8 +66,8 @@
 </div>
 
 <script>
-  // 指定されたURLに修正しました
-  const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbz21KPKoZ1ynzuqF8_FxOq5dUUyfoxYJ4_erDPxLjncP7r84xUCYhWoByOpA5ljocTd/exec";
+  // 直近で新しく作っていただいた正しいGAS URLをセットしています
+  const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxd-TnQiahMty1g_6kpuvjIgJ7DlT38W4SOsr_R1nQqne-KvIUbGhE0vpqcvlVVJyfU4w/exec";
 
   const fileInput = document.getElementById('fileInput');
   const loadingSign = document.getElementById('loadingSign');
@@ -130,9 +132,9 @@
     const payload = {
       operator: operator,
       targetDrug: targetDrug,
-      mode: mode,
+      mode: mode, // ここでAI画像解析モードであることを伝えます
       scannedCode: scannedCode,
-      imageBase64: imageBase64
+      imageBase64: imageBase64 // 写真データを送ります
     };
 
     fetch(GAS_WEB_APP_URL, {
