@@ -12,6 +12,21 @@
                  box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
     h2 { text-align: center; color: #1a3a5c; margin-bottom: 4px; }
     .sub { text-align: center; color: #888; font-size: 13px; margin-bottom: 20px; }
+
+    .step {
+      border: 2px solid #e0e6ec; border-radius: 10px;
+      padding: 16px; margin-bottom: 18px; position: relative;
+    }
+    .step.disabled { opacity: 0.45; pointer-events: none; }
+    .step.done { border-color: #28a745; background: #f4fbf6; }
+    .step-badge {
+      position: absolute; top: -12px; left: 14px; background: #1a3a5c;
+      color: white; font-size: 12px; font-weight: bold;
+      padding: 3px 10px; border-radius: 12px;
+    }
+    .step.done .step-badge { background: #28a745; }
+    .step-title { font-weight: bold; font-size: 15px; margin: 6px 0 12px; color: #1a3a5c; }
+
     label.title { display: block; font-weight: bold;
                   margin-bottom: 6px; font-size: 14px; }
     select, input[type="text"] {
@@ -22,12 +37,27 @@
              font-size: 16px; cursor: pointer; font-weight: bold;
              margin-bottom: 10px; }
     .btn-blue { background: #2980b9; color: white; }
+    .btn-gray { background: #95a5a6; color: white; }
     .photo-btn {
       display: block; width: 100%; padding: 22px 10px;
       background: linear-gradient(135deg, #27ae60, #2ecc71);
       color: white; border-radius: 10px; font-size: 18px;
       cursor: pointer; font-weight: bold; text-align: center;
       box-sizing: border-box; margin-bottom: 16px; }
+    .photo-btn.qr {
+      background: linear-gradient(135deg, #8e44ad, #9b59b6);
+    }
+    .step.disabled .photo-btn { background: #bdc3c7; cursor: not-allowed; }
+
+    .target-display {
+      text-align: center; font-size: 22px; font-weight: bold;
+      padding: 14px; border-radius: 8px; margin-bottom: 14px;
+      background: #eafaf1; border: 2px solid #27ae60; color: #1e7e34;
+    }
+    .target-display.empty {
+      background: #f8f9fa; border: 2px dashed #ccc; color: #999; font-size: 15px;
+    }
+
     .divider { text-align: center; color: #aaa; margin: 18px 0;
                font-size: 13px; border-top: 1px dashed #ddd; padding-top: 14px; }
     .result { margin-top: 20px; padding: 16px; border-radius: 8px;
@@ -36,12 +66,16 @@
     .mismatch { background: #f8d7da; color: #721c24; border: 2px solid #dc3545; }
     .loading  { color: #555; text-align: center; margin-top: 14px; display: none;
                 font-size: 14px; background: #fff3cd; padding: 12px; border-radius: 6px; }
+    .reset-link {
+      text-align: center; margin-top: 16px; font-size: 13px;
+      color: #2980b9; text-decoration: underline; cursor: pointer;
+    }
   </style>
 </head>
 <body>
 <div class="container">
   <h2>キシロカイン照合システム</h2>
-  <p class="sub">AIクラウド解析版</p>
+  <p class="sub">AIクラウド解析版（QR指示読取対応）</p>
 
   <div class="mb">
     <label class="title" for="operator">作業者名</label>
@@ -52,33 +86,47 @@
     </select>
   </div>
 
-  <div class="mb">
-    <label class="title" for="targetDrug">指示された薬剤</label>
-    <select id="targetDrug">
-      <option value="キシロカイン注1%ポリアンプル">キシロカイン注1%  10mL</option>
-      <option value="キシロカイン注2%ポリアンプル">キシロカイン注2%  10mL</option>
-    </select>
+  <!-- STEP 1: 指示QR読取 -->
+  <div class="step" id="step1">
+    <div class="step-badge">STEP 1</div>
+    <div class="step-title">指示QRを撮影して薬剤を確定</div>
+
+    <div id="targetDisplay" class="target-display empty">
+      まだ指示QRを読み取っていません
+    </div>
+
+    <label for="qrFileInput" class="photo-btn qr">
+      📷 指示QRを撮る
+    </label>
+    <input type="file" id="qrFileInput" accept="image/*"
+           capture="environment" style="display:none;">
   </div>
 
-  <div class="mb" style="margin-top:20px;">
+  <!-- STEP 2: アンプル照合 -->
+  <div class="step disabled" id="step2">
+    <div class="step-badge">STEP 2</div>
+    <div class="step-title">アンプルを撮影またはバーコードで照合</div>
+
     <label for="fileInput" class="photo-btn">
       📷 写真を撮ってAIで照合する
     </label>
     <input type="file" id="fileInput" accept="image/*"
            capture="environment" style="display:none;">
+
+    <div class="divider">─── またはバーコードで照合 ───</div>
+
+    <div class="mb">
+      <label class="title" for="barcodeInput">バーコードスキャナ / 手入力</label>
+      <input type="text" id="barcodeInput"
+             placeholder="スキャナをここにかざすか数字を入力"
+             autocomplete="off">
+    </div>
+    <button type="button" id="verifyBtn" class="btn-blue">
+      バーコードで照合・記録
+    </button>
   </div>
 
-  <div class="divider">─── またはバーコードで照合 ───</div>
-
-  <div class="mb">
-    <label class="title" for="barcodeInput">バーコードスキャナ / 手入力</label>
-    <input type="text" id="barcodeInput"
-           placeholder="スキャナをここにかざすか数字を入力"
-           autocomplete="off">
-  </div>
-  <button type="button" id="verifyBtn" class="btn-blue">
-    バーコードで照合・記録
-  </button>
+  <div class="reset-link" id="resetLink">↺ 指示QRを読み直す（別の薬剤に切り替える）</div>
 
   <div id="loadingSign" class="loading">
     サーバーに送信中...<br>少々お待ちください
@@ -90,34 +138,114 @@
   // GASをデプロイした後に発行される "https://script.google.com/macros/s/...exec" のURL
   const GAS_URL = "https://script.google.com/macros/s/AKfycbxr1RMmxzBAdHkvt2W0Z_BUSqhNfeT2DhsTzT0UGqS_JwjwwjZupmf8TzSuV5VsoWsl4g/exec";
 
-  const fileInput   = document.getElementById('fileInput');
-  const loadingSign = document.getElementById('loadingSign');
+  const qrFileInput = document.getElementById('qrFileInput');
+  const fileInput    = document.getElementById('fileInput');
+  const loadingSign  = document.getElementById('loadingSign');
+  const step1        = document.getElementById('step1');
+  const step2        = document.getElementById('step2');
+  const targetDisplay = document.getElementById('targetDisplay');
 
+  let currentTargetDrug = "";   // STEP1で確定した対象薬剤キー
+  let currentTargetLabel = "";
+
+  // ---------- 画像をリサイズしてBase64化する共通関数 ----------
+  function fileToResizedBase64(file, maxW) {
+    return new Promise((resolve, reject) => {
+      var reader = new FileReader();
+      reader.onload = function(ev) {
+        var img = new Image();
+        img.onload = function() {
+          var canvas = document.createElement('canvas');
+          var w = img.width, h = img.height;
+          if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
+          canvas.width = w; canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          resolve(canvas.toDataURL('image/jpeg', 0.8).split(',')[1]);
+        };
+        img.onerror = reject;
+        img.src = ev.target.result;
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  // ---------- STEP1: 指示QR撮影 ----------
+  qrFileInput.addEventListener('change', function(e) {
+    if (!e.target.files.length) return;
+    loadingSign.innerHTML = "指示QRを解析中...";
+    loadingSign.style.display = 'block';
+    hideResult();
+
+    fileToResizedBase64(e.target.files[0], 600).then(function(b64) {
+      return fetch(GAS_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        redirect: 'follow',
+        body: JSON.stringify({ action: 'readOrderQr', imageBase64: b64 })
+      });
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      loadingSign.style.display = 'none';
+      if (data.status === 'success' && data.found) {
+        currentTargetDrug = data.targetDrug;
+        currentTargetLabel = data.targetLabel;
+        targetDisplay.textContent = "対象薬剤：" + currentTargetLabel;
+        targetDisplay.classList.remove('empty');
+        step1.classList.add('done');
+        step2.classList.remove('disabled');
+      } else if (data.status === 'success' && !data.found) {
+        showResult(data.message || "指示QRを認識できませんでした。", false);
+      } else {
+        showResult("サーバーエラー：" + (data.message || "不明なエラー"), false);
+      }
+    })
+    .catch(function() {
+      loadingSign.style.display = 'none';
+      alert('通信エラーが発生しました。\nインターネット接続を確認してください。');
+    });
+
+    qrFileInput.value = "";
+  });
+
+  // ---------- 指示QRの読み直し ----------
+  document.getElementById('resetLink').addEventListener('click', function() {
+    currentTargetDrug = "";
+    currentTargetLabel = "";
+    targetDisplay.textContent = "まだ指示QRを読み取っていません";
+    targetDisplay.classList.add('empty');
+    step1.classList.remove('done');
+    step2.classList.add('disabled');
+    hideResult();
+  });
+
+  // ---------- STEP2: アンプル撮影 ----------
   fileInput.addEventListener('change', function(e) {
     if (!e.target.files.length) return;
+    if (!currentTargetDrug) {
+      alert('先にSTEP1で指示QRを撮影してください。');
+      fileInput.value = "";
+      return;
+    }
     loadingSign.innerHTML = "画像を準備中...";
     loadingSign.style.display = 'block';
     hideResult();
-    var reader = new FileReader();
-    reader.onload = function(ev) {
-      var img = new Image();
-      img.onload = function() {
-        var canvas = document.createElement('canvas');
-        var MAX_W = 500, w = img.width, h = img.height;
-        if (w > MAX_W) { h = Math.round(h * MAX_W / w); w = MAX_W; }
-        canvas.width = w; canvas.height = h;
-        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-        var b64 = canvas.toDataURL('image/jpeg', 0.7).split(',')[1];
-        loadingSign.innerHTML = "AIで解析中...（3〜5秒かかります）";
-        sendToGAS("image", null, b64);
-      };
-      img.src = ev.target.result;
-    };
-    reader.readAsDataURL(e.target.files[0]);
+
+    fileToResizedBase64(e.target.files[0], 500).then(function(b64) {
+      loadingSign.innerHTML = "AIで解析中...（3〜5秒かかります）";
+      sendToGAS("image", null, b64);
+    });
+
     fileInput.value = "";
   });
 
+  // ---------- STEP2: バーコード／手入力 ----------
   document.getElementById('verifyBtn').addEventListener('click', function() {
+    if (!currentTargetDrug) {
+      alert('先にSTEP1で指示QRを撮影してください。');
+      return;
+    }
     var code = document.getElementById('barcodeInput').value.trim();
     if (!code) { alert('バーコードデータを入力してください'); return; }
     loadingSign.innerHTML = "照合・記録中...";
@@ -132,8 +260,9 @@
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       redirect: 'follow',
       body: JSON.stringify({
+        action:      'verify',
         operator:    document.getElementById('operator').value,
-        targetDrug:  document.getElementById('targetDrug').value,
+        targetDrug:  currentTargetDrug,
         mode:        mode,
         scannedCode: scannedCode,
         imageBase64: imageBase64
