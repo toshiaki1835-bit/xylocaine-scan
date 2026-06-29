@@ -70,6 +70,14 @@
       text-align: center; margin-top: 16px; font-size: 13px;
       color: #2980b9; text-decoration: underline; cursor: pointer;
     }
+    .action-row {
+      display: none; gap: 10px; margin-top: 14px;
+    }
+    .action-row.show { display: flex; }
+    .action-row button { margin-bottom: 0; }
+    .btn-continue { background: #2980b9; color: white; }
+    .btn-finish { background: #7f8c8d; color: white; }
+    .required-mark { color: #c0392b; font-weight: bold; margin-left: 4px; }
   </style>
 </head>
 <body>
@@ -78,8 +86,9 @@
   <p class="sub">AIクラウド解析版（QR指示読取対応）</p>
 
   <div class="mb">
-    <label class="title" for="operator">作業者名</label>
+    <label class="title" for="operator">作業者名<span class="required-mark">※必須</span></label>
     <select id="operator">
+      <option value="">選択してください</option>
       <option value="薬剤師A">薬剤師A</option>
       <option value="宇佐見">宇佐見</option>
       <option value="鈴木">鈴木</option>
@@ -95,7 +104,7 @@
   </div>
 
   <!-- STEP 1: 指示QR読取 -->
-  <div class="step" id="step1">
+  <div class="step disabled" id="step1">
     <div class="step-badge">STEP 1</div>
     <div class="step-title">指示QRを撮影して薬剤を確定</div>
 
@@ -116,7 +125,7 @@
     <div class="step-title">アンプルを撮影またはバーコードで照合</div>
 
     <div class="mb">
-      <label class="title" for="fillCount">充填本数</label>
+      <label class="title" for="fillCount">充填本数<span class="required-mark">※必須</span></label>
       <input type="text" id="fillCount" inputmode="numeric" pattern="[0-9]*"
              placeholder="例：3">
     </div>
@@ -146,6 +155,11 @@
     サーバーに送信中...<br>少々お待ちください
   </div>
   <div id="resultBox" class="result"></div>
+
+  <div class="action-row" id="actionRow">
+    <button type="button" id="continueBtn" class="btn-continue">次の作業を続ける</button>
+    <button type="button" id="finishBtn" class="btn-finish">作業終了</button>
+  </div>
 </div>
 
 <script>
@@ -158,9 +172,22 @@
   const step1        = document.getElementById('step1');
   const step2        = document.getElementById('step2');
   const targetDisplay = document.getElementById('targetDisplay');
+  const operatorSelect = document.getElementById('operator');
+  const actionRow     = document.getElementById('actionRow');
 
   let currentTargetDrug = "";   // STEP1で確定した対象薬剤キー
   let currentTargetLabel = "";
+
+  // ---------- 作業者名が選択されたらSTEP1を有効化 ----------
+  function updateStep1Availability() {
+    if (operatorSelect.value) {
+      step1.classList.remove('disabled');
+    } else {
+      step1.classList.add('disabled');
+    }
+  }
+  operatorSelect.addEventListener('change', updateStep1Availability);
+  updateStep1Availability(); // 初期状態反映
 
   // ---------- 画像をリサイズしてBase64化する共通関数 ----------
   function fileToResizedBase64(file, maxW) {
@@ -187,6 +214,11 @@
   // ---------- STEP1: 指示QR撮影 ----------
   qrFileInput.addEventListener('change', function(e) {
     if (!e.target.files.length) return;
+    if (!operatorSelect.value) {
+      alert('作業者名を選択してください。');
+      qrFileInput.value = "";
+      return;
+    }
     loadingSign.innerHTML = "指示QRを解析中...";
     loadingSign.style.display = 'block';
     hideResult();
@@ -225,14 +257,7 @@
 
   // ---------- 指示QRの読み直し ----------
   document.getElementById('resetLink').addEventListener('click', function() {
-    currentTargetDrug = "";
-    currentTargetLabel = "";
-    targetDisplay.textContent = "まだ指示QRを読み取っていません";
-    targetDisplay.classList.add('empty');
-    step1.classList.remove('done');
-    step2.classList.add('disabled');
-    document.getElementById('fillCount').value = "";
-    hideResult();
+    resetSteps();
   });
 
   // ---------- STEP2: アンプル撮影 ----------
@@ -302,6 +327,7 @@
           data.isSuccess
         );
         document.getElementById('barcodeInput').value = "";
+        actionRow.classList.add('show');
       } else {
         showResult("サーバーエラー：" + data.message, false);
       }
@@ -317,7 +343,36 @@
     b.innerText = msg; b.style.display = 'block';
     b.className = ok ? "result match" : "result mismatch";
   }
-  function hideResult() { document.getElementById('resultBox').style.display = 'none'; }
+  function hideResult() {
+    document.getElementById('resultBox').style.display = 'none';
+    actionRow.classList.remove('show');
+  }
+
+  // ---------- STEP1/2の状態を初期化する共通処理 ----------
+  function resetSteps() {
+    currentTargetDrug = "";
+    currentTargetLabel = "";
+    targetDisplay.textContent = "まだ指示QRを読み取っていません";
+    targetDisplay.classList.add('empty');
+    step1.classList.remove('done');
+    step2.classList.add('disabled');
+    document.getElementById('fillCount').value = "";
+    document.getElementById('barcodeInput').value = "";
+    hideResult();
+  }
+
+  // ---------- 次の作業を続ける：作業者名は維持してSTEP1からやり直す ----------
+  document.getElementById('continueBtn').addEventListener('click', function() {
+    resetSteps();
+    updateStep1Availability();
+  });
+
+  // ---------- 作業終了：作業者名も含めて完全に初期化 ----------
+  document.getElementById('finishBtn').addEventListener('click', function() {
+    resetSteps();
+    operatorSelect.value = "";
+    updateStep1Availability();
+  });
 </script>
 </body>
 </html>
