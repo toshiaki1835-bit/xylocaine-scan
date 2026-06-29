@@ -81,8 +81,16 @@
     <label class="title" for="operator">作業者名</label>
     <select id="operator">
       <option value="薬剤師A">薬剤師A</option>
-      <option value="薬剤師B">薬剤師B</option>
-      <option value="看護師C">看護師C</option>
+      <option value="宇佐見">宇佐見</option>
+      <option value="鈴木">鈴木</option>
+      <option value="澄田">澄田</option>
+      <option value="田代">田代</option>
+      <option value="田村">田村</option>
+      <option value="新妻">新妻</option>
+      <option value="花島">花島</option>
+      <option value="宮永">宮永</option>
+      <option value="宮本">宮本</option>
+      <option value="持田">持田</option>
     </select>
   </div>
 
@@ -106,6 +114,12 @@
   <div class="step disabled" id="step2">
     <div class="step-badge">STEP 2</div>
     <div class="step-title">アンプルを撮影またはバーコードで照合</div>
+
+    <div class="mb">
+      <label class="title" for="fillCount">充填本数</label>
+      <input type="text" id="fillCount" inputmode="numeric" pattern="[0-9]*"
+             placeholder="例：3">
+    </div>
 
     <label for="fileInput" class="photo-btn">
       📷 写真を撮ってAIで照合する
@@ -217,6 +231,7 @@
     targetDisplay.classList.add('empty');
     step1.classList.remove('done');
     step2.classList.add('disabled');
+    document.getElementById('fillCount').value = "";
     hideResult();
   });
 
@@ -225,6 +240,11 @@
     if (!e.target.files.length) return;
     if (!currentTargetDrug) {
       alert('先にSTEP1で指示QRを撮影してください。');
+      fileInput.value = "";
+      return;
+    }
+    if (!document.getElementById('fillCount').value.trim()) {
+      alert('充填本数を入力してください。');
       fileInput.value = "";
       return;
     }
@@ -246,6 +266,10 @@
       alert('先にSTEP1で指示QRを撮影してください。');
       return;
     }
+    if (!document.getElementById('fillCount').value.trim()) {
+      alert('充填本数を入力してください。');
+      return;
+    }
     var code = document.getElementById('barcodeInput').value.trim();
     if (!code) { alert('バーコードデータを入力してください'); return; }
     loadingSign.innerHTML = "照合・記録中...";
@@ -263,6 +287,7 @@
         action:      'verify',
         operator:    document.getElementById('operator').value,
         targetDrug:  currentTargetDrug,
+        fillCount:   document.getElementById('fillCount').value.trim(),
         mode:        mode,
         scannedCode: scannedCode,
         imageBase64: imageBase64
